@@ -5,21 +5,174 @@ output:
     keep_md: true
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+###1.Loading and Preprocessing the data
 
+```{r setwd("C:/Users/Family/Desktop/Coursera/RDA/WK2")"}
+setwd("C:/Users/Family/Desktop/Coursera/RDA/WK2")
+if(!file.exists("mfdata")) {dir.create("./mfdata")}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(fileUrl, destfile = "./mfdata/Factivity.zip")
+unzip("./mfdata/Factivity.zip", exdir = "./mfdata")
+cls = c("integer", "character", "integer")
+df <- read.csv("./mfdata/activity.csv", head=TRUE, colClasses=cls, na.strings="NA")
+head(df)
+```
+ Process/transform the data set for analysis later.
+ 
+ Correct the date column and get rid of rows containing missing values.
+ 
+ Save the subset to a new data frame "df1". 
+ 
+```{r Process/tranform the dataset for analysis later}
+df$date <- as.Date(df$date)
+df1 <- subset(df, !is.na(df$steps))
+```
+###2.What is mean total number of steps taken per day? 
 
+Generate a histogram of the daily total number of steps. The histogram shows the distribution of the totals
 
-## What is mean total number of steps taken per day?
+```{r Generate a histogram of the daily total number of steps}
+dailysum <- tapply(df1$steps, df1$date, sum, na.rm=TRUE, simplify=T)
+dailysum <- dailysum[!is.na(dailysum)]
 
+hist(x=dailysum,
+     col="gray",
+     breaks=20,
+     xlab="Daily total steps",
+     ylab="Frequency",
+     main="The distribution of daily total (missing data ignored)")
+```
+```{r}
+```
+Calculate and report mean and median of the total number of steps taken per day
 
+```{r Calculate and report mean and median of the total number of steps taken per day}
+mean(dailysum)
+median(dailysum)
 
-## What is the average daily activity pattern?
+```
+The mean is 10766 steps and the median is 10765 steps.
+```{r}
+```
+###3.What is the average daily activity pattern?
 
+Create a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
+```{r Create a time series plot}
+int_avg <- tapply(df1$steps, df1$interval, mean, na.rm=TRUE, simplify=T)
+df3 <- data.frame(interval=as.integer(names(int_avg)), avg=int_avg)
 
-## Imputing missing values
+with(df3,
+     plot(interval,
+          avg,
+          type="l",
+          xlab="5-minute intervals",
+          ylab="average steps in the interval across all days"))
+```
 
+```{r}
+```
+Determine which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps.
 
+```{r Which 5-minute interval on the average across all the days contains maximum number of steps}
+max_steps <- max(df3$avg)
+df3[df3$avg == max_steps, ]
+```
+5-minute interval number 835 contains maximum number of steps. There are 206 steps in this 5-minute interval .
+```{r}
+```
+###4.Imputing missing values
 
-## Are there differences in activity patterns between weekdays and weekends?
+Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r Number of missing values in the dataset}
+sum(is.na(df$steps))
+```
+The original data set has 2304 rows with missing data.
+```{r}
+```
+Strategy:- Use the mean for 5-minute interval across all the days in the dataset to fill in the the missing values in the dataset.
+```{r}
+```
+Create a new data frame df4 that is equal to the original dataset but with the missing data filled in (using mean for that interval.
+```{r Strategy for filling in the missing values in the dataset}
+df4 <- df1
+ndx <- is.na(df4$steps)
+int_avg <- tapply(df1$steps, df1$interval, mean, na.rm=TRUE, simplify=T)
+df4$steps[ndx] <- int_avg[as.character(df4$interval[ndx])]
+```
+Make a histogram of the total number of steps taken each day. 
+```{r Make a histogram of the total number of steps taken each day}
+New_dailysum <- tapply(df4$steps, df4$date, sum, na.rm=TRUE, simplify=T)
+
+hist(x=New_dailysum,
+     col="Gray",
+     breaks=20,
+     xlab="daily steps",
+     ylab="frequency",
+     main="The distribution of daily total (with missing data imputed)")
+```
+
+```{r}
+```
+Calculate and report the mean and median total number of steps taken per day.
+```{r Calculate and report mean and median of the  new total number of steps taken per day}
+mean(New_dailysum)
+median(New_dailysum)
+```
+The calculated mean and median of the total number of steps from the dataset with imputed missing numbers are  10766 and 10766 respectively (ie mean = 10766, median = 10765).
+
+```{r}
+```
+Compared to the original mean 10766 and median 10765,  The values of the mean and median remain unchanged. 
+
+Explanation - using the mean for 5-minute interval across all the days in the dataset to fill in the the missing values in the dataset leaves central position of the data distribution unchanged. The data is evenly distributed acoss the dataset even though there is a noticeable increase in the frequencies.
+```{r}
+```
+###5.Are there differences in activity patterns between weekdays and weekends?
+
+Create a new factor variable "wkid" in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+
+Create new function to use in determining  if a day is a week day or not.
+```{r Create new factor and function to determine weekday and weekend}
+is_weekday <- function(d) {
+    wd <- weekdays(d)
+    ifelse (wd == "Saturday" | wd == "Sunday", "weekend", "weekday")
+}
+
+wx <- sapply(df4$date, is_weekday)
+df4$wkid <- as.factor(wx)
+head(df4)
+```
+
+```{r}
+```
+Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r Make panel plot}
+wkid_df <- aggregate(steps ~ wkid+interval, data=df4, FUN=mean)
+
+library(lattice)
+xyplot(steps ~ interval | factor(wkid),
+       layout = c(1, 2),
+       xlab="Interval",
+       ylab="Number of steps",
+       type="l",
+       lty=1,
+       data=wkid_df)
+```
+
+```{r}
+```
+The panel plot shows the difference in activity patterns as follows
+
+Weekday activities starts earlier than the weekend activities. Weekday activities start between 5.00am and 6.00am, peaks at around 9.am and maintains lower activity levels compared to weekend activities.Weekday activities end earlier than the weekend activities
+
+Weekend activities starts between 6.00am and8.00am, peaks up at around 10.00am and maintains relatively higher activity levels compared to the weekday activities. Weekend activities ends later than the weekday activities.
+
+```{r}
+```
+####This is the last page ......................
